@@ -1,0 +1,211 @@
+type UserRole = variant {
+  Manufacturer;
+  LogisticsProvider;
+  Retailer;
+  QualityAssurance;
+  SupplyChainManager;
+  Admin;
+  Consumer;
+};
+
+type UserPermissions = record {
+  can_register_products: bool;
+  can_update_supply_chain: bool;
+  can_manage_partners: bool;
+  can_view_analytics: bool;
+  can_verify_users: bool;
+};
+
+type User = record {
+  id: principal;
+  email: text;
+  first_name: text;
+  last_name: text;
+  company: text;
+  role: UserRole;
+  created_at: nat64;
+  is_verified: bool;
+  permissions: UserPermissions;
+};
+
+type UserRegistration = record {
+  email: text;
+  first_name: text;
+  last_name: text;
+  company: text;
+  role: UserRole;
+};
+
+type ProductStatus = variant {
+  Manufacturing;
+  InTransit;
+  Delivered;
+  Recalled;
+};
+
+type Product = record {
+  id: text;
+  name: text;
+  category: text;
+  description: opt text;
+  manufacturer: text;
+  manufacturer_id: principal;
+  batch_number: opt text;
+  production_date: nat64;
+  raw_materials: vec text;
+  certifications: vec text;
+  sustainability_score: opt float64;
+  estimated_value: opt float64;
+  current_status: ProductStatus;
+  current_location: text;
+  created_at: nat64;
+  updated_at: nat64;
+};
+
+type ProductRegistration = record {
+  name: text;
+  category: text;
+  description: opt text;
+  batch_number: opt text;
+  production_date: nat64;
+  manufacturing_location: text;
+  raw_materials: vec text;
+  certifications: vec text;
+  sustainability_score: opt float64;
+  estimated_value: opt float64;
+};
+
+type SupplyChainStage = variant {
+  RawMaterialSourcing;
+  Manufacturing;
+  QualityControl;
+  Packaging;
+  Shipping;
+  Distribution;
+  Retail;
+};
+
+type EventStatus = variant {
+  Pending;
+  InProgress;
+  Completed;
+  Failed;
+};
+
+type SupplyChainEvent = record {
+  id: text;
+  product_id: text;
+  stage: SupplyChainStage;
+  location: text;
+  timestamp: nat64;
+  actor: text;
+  actor_id: principal;
+  status: EventStatus;
+  details: text;
+  certifications: vec text;
+  estimated_arrival: opt nat64;
+  metadata: vec record { text; text };
+};
+
+type SupplyChainEventInput = record {
+  product_id: text;
+  stage: SupplyChainStage;
+  location: text;
+  status: EventStatus;
+  details: text;
+  certifications: vec text;
+  estimated_arrival: opt nat64;
+  metadata: vec record { text; text };
+};
+
+type ProductWithHistory = record {
+  product: Product;
+  supply_chain_events: vec SupplyChainEvent;
+  ethical_score: float64;
+};
+
+type ProductSearchQuery = record {
+  name: opt text;
+  category: opt text;
+  manufacturer: opt text;
+  status: opt ProductStatus;
+  limit: opt nat32;
+};
+
+type PartnerType = variant {
+  Manufacturer;
+  Supplier;
+  LogisticsProvider;
+  Distributor;
+  Retailer;
+  CertificationBody;
+};
+
+type Partner = record {
+  id: principal;
+  company_name: text;
+  partner_type: PartnerType;
+  contact_email: text;
+  contact_person: text;
+  certifications: vec text;
+  verified: bool;
+  created_at: nat64;
+  reputation_score: nat32;
+};
+
+type PartnerRegistration = record {
+  company_name: text;
+  partner_type: PartnerType;
+  contact_email: text;
+  contact_person: text;
+  certifications: vec text;
+};
+
+type AnalyticsData = record {
+  total_products: nat64;
+  active_shipments: nat64;
+  completed_deliveries: nat64;
+  average_ethical_score: float64;
+  total_partners: nat64;
+  total_users: nat64;
+};
+
+type CanisterStatus = record {
+  version: text;
+  total_products: nat64;
+  total_users: nat64;
+  total_events: nat64;
+  uptime: nat64;
+};
+
+type Result = variant { Ok: User; Err: text };
+type Result_1 = variant { Ok: text; Err: text };
+type Result_2 = variant { Ok: ProductWithHistory; Err: text };
+type Result_3 = variant { Ok: vec SupplyChainEvent; Err: text };
+type Result_4 = variant { Ok; Err: text };
+
+service : {
+  // User Management
+  register_user: (UserRegistration) -> (Result);
+  get_user: () -> (Result) query;
+  update_user_verification: (principal, bool) -> (Result_4);
+  
+  // Product Management
+  register_product: (ProductRegistration) -> (Result_1);
+  get_product: (text) -> (Result_2) query;
+  search_products: (ProductSearchQuery) -> (vec Product) query;
+  
+  // Supply Chain Events
+  add_supply_chain_event: (SupplyChainEventInput) -> (Result_1);
+  get_supply_chain_events: (text) -> (Result_3) query;
+  
+  // Partner Management
+  register_partner: (PartnerRegistration) -> (Result_4);
+  get_partners: () -> (vec Partner) query;
+  
+  // Analytics
+  get_analytics: () -> (AnalyticsData) query;
+  
+  // System
+  get_canister_status: () -> (CanisterStatus) query;
+}
