@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Package, Plus, X, CheckCircle, Wallet, User } from "lucide-react"
+import { Package, Plus, X, CheckCircle, Wallet } from "lucide-react"
 import Link from "next/link"
 import { WalletConnect } from "@/components/wallet-connect"
 import { useICPWallet } from "@/hooks/use-icp-wallet"
@@ -41,8 +41,6 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [registeredProductId, setRegisteredProductId] = useState("")
-  const [userProfile, setUserProfile] = useState(null)
-  const [isLoadingUser, setIsLoadingUser] = useState(false)
 
   const categories = [
     "Apparel",
@@ -77,31 +75,6 @@ export default function RegisterPage() {
     "Carbon Neutral",
     "Rainforest Alliance",
   ]
-
-  // Load user profile when connected
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (isConnected && principal) {
-        setIsLoadingUser(true)
-        try {
-          const result = await icpClient.getUser()
-          if (result.Ok) {
-            setUserProfile(result.Ok)
-            setFormData((prev) => ({
-              ...prev,
-              manufacturer: result.Ok.company || "",
-            }))
-          }
-        } catch (error) {
-          console.log("User not registered yet, that's okay")
-        } finally {
-          setIsLoadingUser(false)
-        }
-      }
-    }
-
-    loadUserProfile()
-  }, [isConnected, principal])
 
   const addMaterial = () => {
     if (newMaterial.trim() && !formData.rawMaterials.includes(newMaterial.trim())) {
@@ -161,9 +134,11 @@ export default function RegisterPage() {
 
     setIsSubmitting(true)
 
+    let productData // Declare productData variable
+
     try {
       // Prepare product data for ICP canister
-      const productData = {
+      productData = {
         name: formData.productName,
         category: formData.category,
         description: formData.description ? [formData.description] : [],
@@ -197,9 +172,58 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error("❌ Product registration failed:", error)
+
+      let errorMessage = "Unknown error occurred"
+
+      if (error.message) {
+        if (error.message.includes("verification failed")) {
+          errorMessage = "Authentication failed. Please disconnect and reconnect your wallet."
+        } else if (error.message.includes("Authentication expired")) {
+          errorMessage = "Your session has expired. Please reconnect your wallet."
+        } else if (error.message.includes("Not authenticated")) {
+          errorMessage = "Please connect your Internet Identity wallet first."
+        } else if (error.message.includes("User not found")) {
+          errorMessage = "User profile not found. Creating one automatically..."
+
+          // Try to auto-register user
+          try {
+            console.log("🔄 Auto-registering user...")
+            const userData = {
+              email: `${principal.toString().slice(0, 8)}@suptrus.com`,
+              first_name: "User",
+              last_name: principal.toString().slice(0, 8),
+              company: formData.manufacturer,
+              role: { Manufacturer: null },
+            }
+
+            await icpClient.registerUser(userData)
+            console.log("✅ User auto-registered, retrying product registration...")
+
+            // Retry product registration
+            const retryResult = await icpClient.registerProduct(productData)
+            if (retryResult.Ok) {
+              setRegisteredProductId(retryResult.Ok)
+              setIsSuccess(true)
+              toast({
+                title: "🎉 Product Registered Successfully!",
+                description: `Your product has been added to the blockchain with ID: ${retryResult.Ok}`,
+              })
+              return // Exit early on success
+            } else {
+              errorMessage = retryResult.Err || "Failed to register product after user registration"
+            }
+          } catch (userError) {
+            console.error("❌ Failed to auto-register user:", userError)
+            errorMessage = "Failed to register user and product. Please try again."
+          }
+        } else {
+          errorMessage = error.message
+        }
+      }
+
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -284,24 +308,12 @@ export default function RegisterPage() {
             </Alert>
           )}
 
-          {isConnected && !userProfile && !isLoadingUser && (
-            <Alert className="mb-6">
-              <User className="h-4 w-4" />
-              <AlertDescription>
-                <strong>User profile not found.</strong> You may need to register as a user first.
-                <Link href="/auth/register" className="text-blue-600 hover:underline ml-1">
-                  Register here
-                </Link>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {isConnected && userProfile && (
+          {isConnected && (
             <Alert className="mb-6 border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                <strong>Ready to register!</strong> Connected as {userProfile.first_name} {userProfile.last_name} from{" "}
-                {userProfile.company}
+                <strong>Ready to register!</strong> Connected with Internet Identity:{" "}
+                {principal?.toString().slice(0, 8)}...
               </AlertDescription>
             </Alert>
           )}

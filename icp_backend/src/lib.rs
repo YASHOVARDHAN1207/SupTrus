@@ -110,11 +110,34 @@ fn update_user_verification(user_id: Principal, verified: bool) -> Result<(), St
 fn register_product(product_data: ProductRegistration) -> Result<String, String> {
     let caller = ic_cdk::caller();
     
-    // Verify user exists and has permission
-    let user = get_user_by_principal(&caller)?;
-    if !user.permissions.can_register_products {
-        return Err("Unauthorized: Cannot register products".to_string());
+    if caller == Principal::anonymous() {
+        return Err("Anonymous users cannot register products".to_string());
     }
+
+    // Try to get user, if not found, create a basic user profile
+    let user = match get_user_by_principal(&caller) {
+        Ok(user) => user,
+        Err(_) => {
+            // Auto-create a basic user profile
+            let basic_user = User {
+                id: caller,
+                email: format!("{}@suptrus.com", caller.to_string().chars().take(8).collect::<String>()),
+                first_name: "User".to_string(),
+                last_name: caller.to_string().chars().take(8).collect::<String>(),
+                company: "Unknown Company".to_string(),
+                role: UserRole::Manufacturer,
+                created_at: time(),
+                is_verified: false,
+                permissions: get_default_permissions(&UserRole::Manufacturer),
+            };
+            
+            USERS.with(|users| {
+                users.borrow_mut().insert(caller, basic_user.clone());
+            });
+            
+            basic_user
+        }
+    };
 
     let product_id = generate_product_id(&product_data.category);
     let current_time = time();
@@ -210,6 +233,36 @@ fn search_products(query: ProductSearchQuery) -> Vec<Product> {
                 }
             })
             .take(query.limit.unwrap_or(50) as usize)
+            .collect()
+    })
+}
+
+// NEW: Get all products for a specific user
+#[query]
+fn get_user_products() -> Vec<Product> {
+    let caller = ic_cdk::caller();
+    
+    PRODUCTS.with(|products| {
+        products.borrow()
+            .iter()
+            .filter_map(|(_, product)| {
+                if product.manufacturer_id == caller {
+                    Some(product)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    })
+}
+
+// NEW: Get all products (for admin or general viewing)
+#[query]
+fn get_all_products() -> Vec<Product> {
+    PRODUCTS.with(|products| {
+        products.borrow()
+            .iter()
+            .map(|(_, product)| product)
             .collect()
     })
 }

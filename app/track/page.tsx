@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, Package, MapPin, Calendar, User, CheckCircle, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
 import { WalletConnect } from "@/components/wallet-connect"
+import { icpClient } from "@/lib/icp-client"
 
 // Mock data for demonstration
 const mockProductData = {
@@ -94,19 +95,102 @@ export default function TrackPage() {
   const [productData, setProductData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Update the handleSearch function to work with real ICP data:
   const handleSearch = async () => {
     if (!productId.trim()) return
 
     setIsLoading(true)
-    // Simulate API call to ICP canister
-    setTimeout(() => {
+    try {
+      console.log("🔍 Searching for product:", productId)
+
+      // Try to get product from ICP canister
+      const result = await icpClient.getProduct(productId)
+      console.log("📦 Product search result:", result)
+
+      if (result.Ok) {
+        // Transform ICP data to match our display format
+        const icpProduct = result.Ok.product
+        const icpEvents = result.Ok.supply_chain_events || []
+
+        const transformedProduct = {
+          id: icpProduct.id,
+          name: icpProduct.name,
+          category: icpProduct.category,
+          manufacturer: icpProduct.manufacturer,
+          currentStatus: getStatusFromICP(icpProduct.current_status),
+          ethicalScore: result.Ok.ethical_score || 0,
+          timeline: icpEvents.map((event) => ({
+            id: event.id,
+            stage: getStageDisplayName(event.stage),
+            location: event.location,
+            timestamp: new Date(Number(event.timestamp) / 1000000).toISOString(),
+            actor: event.actor,
+            status: getEventStatusDisplay(event.status),
+            details: event.details,
+            certifications: event.certifications,
+            estimatedArrival: event.estimated_arrival
+              ? new Date(Number(event.estimated_arrival) / 1000000).toISOString()
+              : null,
+          })),
+        }
+
+        setProductData(transformedProduct)
+      } else {
+        console.log("❌ Product not found:", result.Err)
+        setProductData(null)
+      }
+    } catch (error) {
+      console.error("❌ Search error:", error)
+      // Fall back to mock data for demo
       if (productId === "CT-2024-001234") {
         setProductData(mockProductData)
       } else {
         setProductData(null)
       }
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
+  }
+
+  // Add useEffect to handle URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const idFromUrl = urlParams.get("id")
+    if (idFromUrl) {
+      setProductId(idFromUrl)
+      // Auto-search when ID is provided in URL
+      setTimeout(() => {
+        handleSearch()
+      }, 1000)
+    }
+  }, [])
+
+  // Add helper functions to transform ICP data:
+  const getStatusFromICP = (icpStatus) => {
+    if (icpStatus.Manufacturing) return "Manufacturing"
+    if (icpStatus.InTransit) return "In Transit"
+    if (icpStatus.Delivered) return "Delivered"
+    if (icpStatus.Recalled) return "Recalled"
+    return "Unknown"
+  }
+
+  const getStageDisplayName = (icpStage) => {
+    if (icpStage.RawMaterialSourcing) return "Raw Material Sourcing"
+    if (icpStage.Manufacturing) return "Manufacturing"
+    if (icpStage.QualityControl) return "Quality Control"
+    if (icpStage.Packaging) return "Packaging"
+    if (icpStage.Shipping) return "Shipping"
+    if (icpStage.Distribution) return "Distribution"
+    if (icpStage.Retail) return "Retail"
+    return "Unknown"
+  }
+
+  const getEventStatusDisplay = (icpStatus) => {
+    if (icpStatus.Pending) return "pending"
+    if (icpStatus.InProgress) return "in_progress"
+    if (icpStatus.Completed) return "completed"
+    if (icpStatus.Failed) return "failed"
+    return "pending"
   }
 
   const getStatusIcon = (status: string) => {

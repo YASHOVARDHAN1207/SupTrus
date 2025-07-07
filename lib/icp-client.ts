@@ -10,7 +10,7 @@ const HOST = NETWORK === "ic" ? "https://ic0.app" : "http://localhost:4943"
 const INTERNET_IDENTITY_CANISTER_ID =
   NETWORK === "ic"
     ? "rdmx6-jaaaa-aaaaa-aaadq-cai" // Mainnet Internet Identity
-    : process.env.NEXT_PUBLIC_INTERNET_IDENTITY_CANISTER_ID || "be2us-64aaa-aaaaa-qaabq-cai" // Local II
+    : process.env.NEXT_PUBLIC_INTERNET_IDENTITY_CANISTER_ID || "rdmx6-jaaaa-aaaaa-aaadq-cai" // Local II
 
 const IDENTITY_PROVIDER =
   NETWORK === "ic" ? "https://identity.ic0.app" : `http://${INTERNET_IDENTITY_CANISTER_ID}.localhost:4943`
@@ -37,12 +37,58 @@ const idlFactory = ({ IDL }: any) => {
     Consumer: IDL.Null,
   })
 
+  const UserPermissions = IDL.Record({
+    can_register_products: IDL.Bool,
+    can_update_supply_chain: IDL.Bool,
+    can_manage_partners: IDL.Bool,
+    can_view_analytics: IDL.Bool,
+    can_verify_users: IDL.Bool,
+  })
+
+  const User = IDL.Record({
+    id: IDL.Principal,
+    email: IDL.Text,
+    first_name: IDL.Text,
+    last_name: IDL.Text,
+    company: IDL.Text,
+    role: UserRole,
+    created_at: IDL.Nat64,
+    is_verified: IDL.Bool,
+    permissions: UserPermissions,
+  })
+
   const UserRegistration = IDL.Record({
     email: IDL.Text,
     first_name: IDL.Text,
     last_name: IDL.Text,
     company: IDL.Text,
     role: UserRole,
+  })
+
+  const ProductStatus = IDL.Variant({
+    Manufacturing: IDL.Null,
+    InTransit: IDL.Null,
+    Delivered: IDL.Null,
+    Recalled: IDL.Null,
+  })
+
+  const Product = IDL.Record({
+    id: IDL.Text,
+    name: IDL.Text,
+    category: IDL.Text,
+    description: IDL.Opt(IDL.Text),
+    manufacturer: IDL.Text,
+    manufacturer_id: IDL.Principal,
+    batch_number: IDL.Opt(IDL.Text),
+    production_date: IDL.Nat64,
+    raw_materials: IDL.Vec(IDL.Text),
+    certifications: IDL.Vec(IDL.Text),
+    sustainability_score: IDL.Opt(IDL.Float64),
+    estimated_value: IDL.Opt(IDL.Float64),
+    current_status: ProductStatus,
+    current_location: IDL.Text,
+    created_at: IDL.Nat64,
+    updated_at: IDL.Nat64,
   })
 
   const ProductRegistration = IDL.Record({
@@ -58,13 +104,83 @@ const idlFactory = ({ IDL }: any) => {
     estimated_value: IDL.Opt(IDL.Float64),
   })
 
+  const SupplyChainStage = IDL.Variant({
+    RawMaterialSourcing: IDL.Null,
+    Manufacturing: IDL.Null,
+    QualityControl: IDL.Null,
+    Packaging: IDL.Null,
+    Shipping: IDL.Null,
+    Distribution: IDL.Null,
+    Retail: IDL.Null,
+  })
+
+  const EventStatus = IDL.Variant({
+    Pending: IDL.Null,
+    InProgress: IDL.Null,
+    Completed: IDL.Null,
+    Failed: IDL.Null,
+  })
+
+  const SupplyChainEvent = IDL.Record({
+    id: IDL.Text,
+    product_id: IDL.Text,
+    stage: SupplyChainStage,
+    location: IDL.Text,
+    timestamp: IDL.Nat64,
+    actor: IDL.Text,
+    actor_id: IDL.Principal,
+    status: EventStatus,
+    details: IDL.Text,
+    certifications: IDL.Vec(IDL.Text),
+    estimated_arrival: IDL.Opt(IDL.Nat64),
+    metadata: IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)),
+  })
+
+  const ProductWithHistory = IDL.Record({
+    product: Product,
+    supply_chain_events: IDL.Vec(SupplyChainEvent),
+    ethical_score: IDL.Float64,
+  })
+
+  const ProductSearchQuery = IDL.Record({
+    name: IDL.Opt(IDL.Text),
+    category: IDL.Opt(IDL.Text),
+    manufacturer: IDL.Opt(IDL.Text),
+    status: IDL.Opt(ProductStatus),
+    limit: IDL.Opt(IDL.Nat32),
+  })
+
+  const AnalyticsData = IDL.Record({
+    total_products: IDL.Nat64,
+    active_shipments: IDL.Nat64,
+    completed_deliveries: IDL.Nat64,
+    average_ethical_score: IDL.Float64,
+    total_partners: IDL.Nat64,
+    total_users: IDL.Nat64,
+  })
+
+  const CanisterStatus = IDL.Record({
+    version: IDL.Text,
+    total_products: IDL.Nat64,
+    total_users: IDL.Nat64,
+    total_events: IDL.Nat64,
+    uptime: IDL.Nat64,
+  })
+
+  const Result = IDL.Variant({ Ok: User, Err: IDL.Text })
+  const Result_1 = IDL.Variant({ Ok: IDL.Text, Err: IDL.Text })
+  const Result_2 = IDL.Variant({ Ok: ProductWithHistory, Err: IDL.Text })
+
   return IDL.Service({
-    register_user: IDL.Func([UserRegistration], [IDL.Variant({ Ok: IDL.Record({}), Err: IDL.Text })], []),
-    register_product: IDL.Func([ProductRegistration], [IDL.Variant({ Ok: IDL.Text, Err: IDL.Text })], []),
-    get_product: IDL.Func([IDL.Text], [IDL.Variant({ Ok: IDL.Record({}), Err: IDL.Text })], ["query"]),
-    get_analytics: IDL.Func([], [IDL.Record({})], ["query"]),
-    get_canister_status: IDL.Func([], [IDL.Record({})], ["query"]),
-    get_user: IDL.Func([], [IDL.Variant({ Ok: IDL.Record({}), Err: IDL.Text })], ["query"]),
+    register_user: IDL.Func([UserRegistration], [Result], []),
+    get_user: IDL.Func([], [Result], ["query"]),
+    register_product: IDL.Func([ProductRegistration], [Result_1], []),
+    get_product: IDL.Func([IDL.Text], [Result_2], ["query"]),
+    get_analytics: IDL.Func([], [AnalyticsData], ["query"]),
+    get_canister_status: IDL.Func([], [CanisterStatus], ["query"]),
+    search_products: IDL.Func([ProductSearchQuery], [IDL.Vec(Product)], ["query"]),
+    get_user_products: IDL.Func([], [IDL.Vec(Product)], ["query"]),
+    get_all_products: IDL.Func([], [IDL.Vec(Product)], ["query"]),
   })
 }
 
@@ -112,6 +228,17 @@ export class ICPClient {
       if (!this.authClient) {
         console.log("🔄 AuthClient not initialized, initializing...")
         await this.init()
+      }
+
+      // Test if Internet Identity is accessible
+      try {
+        const testResponse = await fetch(IDENTITY_PROVIDER, { mode: "no-cors" })
+        console.log("✅ Internet Identity is accessible")
+      } catch (error) {
+        console.error("❌ Internet Identity not accessible:", IDENTITY_PROVIDER)
+        throw new Error(
+          `Internet Identity not accessible at ${IDENTITY_PROVIDER}. Make sure dfx is running and Internet Identity is deployed.`,
+        )
       }
 
       return new Promise((resolve) => {
@@ -197,6 +324,10 @@ export class ICPClient {
       console.log("🔄 Setting up actor...")
       const identity = await this.getIdentity()
 
+      if (!identity) {
+        throw new Error("No identity available")
+      }
+
       this.agent = new HttpAgent({
         host: HOST,
         identity,
@@ -209,7 +340,8 @@ export class ICPClient {
           await this.agent.fetchRootKey()
           console.log("✅ Root key fetched successfully")
         } catch (error) {
-          console.error("⚠️ Failed to fetch root key (this is normal for mainnet):", error)
+          console.error("⚠️ Failed to fetch root key:", error)
+          // Don't throw here, continue with actor creation
         }
       }
 
@@ -252,15 +384,43 @@ export class ICPClient {
   }
 
   async registerProduct(productData: any) {
-    if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
+    if (!this.actor) {
+      throw new Error("Not authenticated - please connect your wallet first")
+    }
+
     console.log("🔄 Registering product:", productData)
-    return await this.actor.register_product(productData)
+
+    try {
+      // Ensure we're properly authenticated before making the call
+      const isAuth = await this.isAuthenticated()
+      if (!isAuth) {
+        throw new Error("Authentication expired - please reconnect your wallet")
+      }
+
+      const result = await this.actor.register_product(productData)
+      console.log("📦 Raw registration result:", result)
+      return result
+    } catch (error) {
+      console.error("❌ Product registration error:", error)
+      throw error
+    }
   }
 
   async getProduct(productId: string) {
-    if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
+    if (!this.actor) {
+      throw new Error("Not authenticated - please connect your wallet first")
+    }
+
     console.log("🔄 Getting product:", productId)
-    return await this.actor.get_product(productId)
+
+    try {
+      const result = await this.actor.get_product(productId)
+      console.log("📦 Raw product result:", result)
+      return result
+    } catch (error) {
+      console.error("❌ Get product error:", error)
+      throw error
+    }
   }
 
   async getAnalytics() {
@@ -279,6 +439,34 @@ export class ICPClient {
     if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
     console.log("🔄 Getting user...")
     return await this.actor.get_user()
+  }
+
+  // NEW: Get user's products
+  async getUserProducts() {
+    if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
+    console.log("🔄 Getting user products...")
+    return await this.actor.get_user_products()
+  }
+
+  // NEW: Get all products
+  async getAllProducts() {
+    if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
+    console.log("🔄 Getting all products...")
+    return await this.actor.get_all_products()
+  }
+
+  async searchProducts(query: any) {
+    if (!this.actor) throw new Error("Not authenticated - please connect your wallet first")
+    console.log("🔄 Searching products with query:", query)
+
+    try {
+      const result = await this.actor.search_products(query)
+      console.log("🔍 Search results:", result)
+      return result
+    } catch (error) {
+      console.error("❌ Search products error:", error)
+      throw error
+    }
   }
 
   // Mock wallet methods for demo

@@ -25,6 +25,30 @@ export const idlFactory = ({ IDL }) => {
     'location' : IDL.Text,
   });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const ProductStatus = IDL.Variant({
+    'InTransit' : IDL.Null,
+    'Delivered' : IDL.Null,
+    'Recalled' : IDL.Null,
+    'Manufacturing' : IDL.Null,
+  });
+  const Product = IDL.Record({
+    'id' : IDL.Text,
+    'batch_number' : IDL.Opt(IDL.Text),
+    'updated_at' : IDL.Nat64,
+    'production_date' : IDL.Nat64,
+    'manufacturer' : IDL.Text,
+    'estimated_value' : IDL.Opt(IDL.Float64),
+    'sustainability_score' : IDL.Opt(IDL.Float64),
+    'name' : IDL.Text,
+    'description' : IDL.Opt(IDL.Text),
+    'created_at' : IDL.Nat64,
+    'current_location' : IDL.Text,
+    'category' : IDL.Text,
+    'current_status' : ProductStatus,
+    'certifications' : IDL.Vec(IDL.Text),
+    'raw_materials' : IDL.Vec(IDL.Text),
+    'manufacturer_id' : IDL.Principal,
+  });
   const AnalyticsData = IDL.Record({
     'completed_deliveries' : IDL.Nat64,
     'total_users' : IDL.Nat64,
@@ -72,30 +96,6 @@ export const idlFactory = ({ IDL }) => {
     'details' : IDL.Text,
     'certifications' : IDL.Vec(IDL.Text),
     'location' : IDL.Text,
-  });
-  const ProductStatus = IDL.Variant({
-    'InTransit' : IDL.Null,
-    'Delivered' : IDL.Null,
-    'Recalled' : IDL.Null,
-    'Manufacturing' : IDL.Null,
-  });
-  const Product = IDL.Record({
-    'id' : IDL.Text,
-    'batch_number' : IDL.Opt(IDL.Text),
-    'updated_at' : IDL.Nat64,
-    'production_date' : IDL.Nat64,
-    'manufacturer' : IDL.Text,
-    'estimated_value' : IDL.Opt(IDL.Float64),
-    'sustainability_score' : IDL.Opt(IDL.Float64),
-    'name' : IDL.Text,
-    'description' : IDL.Opt(IDL.Text),
-    'created_at' : IDL.Nat64,
-    'current_location' : IDL.Text,
-    'category' : IDL.Text,
-    'current_status' : ProductStatus,
-    'certifications' : IDL.Vec(IDL.Text),
-    'raw_materials' : IDL.Vec(IDL.Text),
-    'manufacturer_id' : IDL.Principal,
   });
   const ProductWithHistory = IDL.Record({
     'supply_chain_events' : IDL.Vec(SupplyChainEvent),
@@ -175,12 +175,14 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
+    'get_all_products' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'get_analytics' : IDL.Func([], [AnalyticsData], ['query']),
     'get_canister_status' : IDL.Func([], [CanisterStatus], ['query']),
     'get_partners' : IDL.Func([], [IDL.Vec(Partner)], ['query']),
     'get_product' : IDL.Func([IDL.Text], [Result_2], ['query']),
     'get_supply_chain_events' : IDL.Func([IDL.Text], [Result_3], ['query']),
     'get_user' : IDL.Func([], [Result], ['query']),
+    'get_user_products' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'register_partner' : IDL.Func([PartnerRegistration], [Result_4], []),
     'register_product' : IDL.Func([ProductRegistration], [Result_1], []),
     'register_user' : IDL.Func([UserRegistration], [Result], []),

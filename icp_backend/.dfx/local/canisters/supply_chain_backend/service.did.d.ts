@@ -166,12 +166,14 @@ export type UserRole = { 'LogisticsProvider' : null } |
   { 'Manufacturer' : null };
 export interface _SERVICE {
   'add_supply_chain_event' : ActorMethod<[SupplyChainEventInput], Result_1>,
+  'get_all_products' : ActorMethod<[], Array<Product>>,
   'get_analytics' : ActorMethod<[], AnalyticsData>,
   'get_canister_status' : ActorMethod<[], CanisterStatus>,
   'get_partners' : ActorMethod<[], Array<Partner>>,
   'get_product' : ActorMethod<[string], Result_2>,
   'get_supply_chain_events' : ActorMethod<[string], Result_3>,
   'get_user' : ActorMethod<[], Result>,
+  'get_user_products' : ActorMethod<[], Array<Product>>,
   'register_partner' : ActorMethod<[PartnerRegistration], Result_4>,
   'register_product' : ActorMethod<[ProductRegistration], Result_1>,
   'register_user' : ActorMethod<[UserRegistration], Result>,

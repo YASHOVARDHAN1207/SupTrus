@@ -148,6 +148,30 @@ export function WalletConnect() {
     }
   }
 
+  const clearCacheAndReconnect = async () => {
+    try {
+      // Clear any cached authentication
+      await disconnect()
+
+      // Wait a moment
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Reconnect
+      await handleConnect()
+
+      toast({
+        title: "Cache Cleared",
+        description: "Cleared authentication cache and reconnected",
+      })
+    } catch (error) {
+      toast({
+        title: "Clear Cache Failed",
+        description: "Failed to clear cache and reconnect",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <Button disabled>
@@ -244,9 +268,19 @@ export function WalletConnect() {
                       </span>
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={testConnection} className="w-full bg-transparent">
-                    Test Connection
-                  </Button>
+                  <div className="space-y-1">
+                    <Button size="sm" variant="outline" onClick={testConnection} className="w-full bg-transparent">
+                      Test Connection
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={clearCacheAndReconnect}
+                      className="w-full bg-transparent"
+                    >
+                      Clear Cache & Reconnect
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -194,6 +194,8 @@ service : {
   register_product: (ProductRegistration) -> (Result_1);
   get_product: (text) -> (Result_2) query;
   search_products: (ProductSearchQuery) -> (vec Product) query;
+  get_user_products: () -> (vec Product) query;
+  get_all_products: () -> (vec Product) query;
   
   // Supply Chain Events
   add_supply_chain_event: (SupplyChainEventInput) -> (Result_1);
